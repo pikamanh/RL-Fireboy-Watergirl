@@ -67,11 +67,13 @@ JUMP_VY  = -4.35
 # ---------------------------------------------------------------------------
 # Actions
 # ---------------------------------------------------------------------------
-ACT_IDLE  = 0
-ACT_LEFT  = 1
-ACT_RIGHT = 2
-ACT_JUMP  = 3
-N_ACTIONS = 4
+ACT_IDLE       = 0
+ACT_LEFT       = 1
+ACT_RIGHT      = 2
+ACT_JUMP       = 3
+ACT_JUMP_LEFT  = 4
+ACT_JUMP_RIGHT = 5
+N_ACTIONS      = 6
 
 
 # ---------------------------------------------------------------------------
@@ -138,14 +140,14 @@ def step_player(s: PlayerState, action: int, tiles: list[int]) -> PlayerState:
     # ------------------------------------------------------------------ #
     # 1. Apply horizontal action (sets vx each frame, not accumulated)
     # ------------------------------------------------------------------ #
-    if action == ACT_LEFT:
+    if action in (ACT_LEFT, ACT_JUMP_LEFT):
         p.vx = -MOVE_VX
-    elif action == ACT_RIGHT:
+    elif action in (ACT_RIGHT, ACT_JUMP_RIGHT):
         p.vx = MOVE_VX
     else:
         p.vx = 0.0
 
-    if action == ACT_JUMP and p.on_ground:
+    if action in (ACT_JUMP, ACT_JUMP_LEFT, ACT_JUMP_RIGHT) and p.on_ground:
         p.vy = JUMP_VY
 
     # ------------------------------------------------------------------ #

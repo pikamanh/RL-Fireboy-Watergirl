@@ -154,8 +154,8 @@ class MultiLevelEnv(gym.Env):
     """
     Gymnasium env that picks a random level on every reset.
 
-    Observation space: 15 floats = FBWGEnv's 14 + normalised level_id.
-    Action space     : MultiDiscrete([4, 4])  (unchanged from FBWGEnv).
+    Observation space: FBWGEnv observation + one normalised level_id.
+    Action space     : unchanged from FBWGEnv.
 
     Args:
         level_ids  : Levels to sample from, e.g. [1, 2, 3, 4, 5, 6].
@@ -187,9 +187,12 @@ class MultiLevelEnv(gym.Env):
         self._current_level: int = level_ids[0]
         self._env: FBWGEnv = FBWGEnv(level_id=self._current_level, max_steps=max_steps)
 
-        # 14-D base obs + 1 normalised level feature
+        # Base obs + 1 normalised level feature.
         self.observation_space = spaces.Box(
-            low=0.0, high=1.0, shape=(15,), dtype=np.float32
+            low=0.0,
+            high=1.0,
+            shape=(self._env.observation_space.shape[0] + 1,),
+            dtype=np.float32,
         )
         self.action_space = self._env.action_space
         self._episode_return: float = 0.0

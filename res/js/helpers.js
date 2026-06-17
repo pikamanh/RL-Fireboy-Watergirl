@@ -81,12 +81,12 @@ const jsonsFiles = [
 
 async function loadData() {
     try {
-        jsonsFiles.map(async (jsonFile) => {
+        await Promise.all(jsonsFiles.map(async (jsonFile) => {
             const file = await fetch(`./res/data/${jsonFile}.json`);
             const data = await file.json();
 
             gameData[jsonFile] = data;
-        });
+        }));
     } catch (err) {
         console.log(err);
     }

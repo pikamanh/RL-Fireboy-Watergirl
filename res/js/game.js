@@ -32,6 +32,7 @@ import { quests } from "./menu/quests.js";
 import { drawTime, formatTime, levelTime } from "./time.js";
 import { Bridge } from "./ingameAssets/bridge.js";
 import { Ball } from "./ingameAssets/ball.js";
+import { applyRlActions, isRlEnabled, requestRlAction, resetRlAgent } from "./rlAgent.js";
 
 let bgBlocks, died, menuButtonPressed, pauseGame, collisionBlocks, ponds;
 
@@ -70,6 +71,7 @@ function startGame() {
     allDoors = [];
     allBridges = [];
     allBalls = [];
+    resetRlAgent();
 
     setLevelCompleted(false);
 
@@ -403,15 +405,16 @@ function playGame() {
             //     collisionBlock.draw();
             // });
 
-            allLevers.forEach((lever) => {
-                lever.checkAngle();
-                lever.drawLever();
-            });
+        allLevers.forEach((lever) => {
+            lever.checkAngle();
+            lever.drawLever();
+        });
 
-            allPlayers.forEach((player) => {
-                if (player.keys.pressed.left) {
-                    player.velocity.x = -2;
-                    player.changeSprite("left");
+        applyRlActions(allPlayers);
+        allPlayers.forEach((player) => {
+            if (player.keys.pressed.left) {
+                player.velocity.x = -2;
+                player.changeSprite("left");
                 } else if (player.keys.pressed.right) {
                     player.velocity.x = 2;
                     player.changeSprite("right");
@@ -442,12 +445,13 @@ function playGame() {
                     });
                 }
 
-                player.checkDoors();
+            player.checkDoors();
 
-                if (player.died) {
-                    died = true;
-                }
-            });
+            if (player.died) {
+                died = true;
+            }
+        });
+        requestRlAction(allPlayers);
 
             ponds.forEach((pond) => {
                 pond.draw();
@@ -601,6 +605,17 @@ function playGame() {
         }, 1);
     }
 
+    if (isRlEnabled()) {
+        const levelParam = Number(new URLSearchParams(window.location.search).get("level") || 1);
+        const levelId = Number.isInteger(levelParam) ? String(levelParam) : "1";
+        if (gameData.players.fireboy[levelId]) {
+            setCurrentLevel(levelId);
+            setMenuActive(null);
+            startGame();
+            animation();
+        }
+    }
+
     canvas.onmousedown = (event) => {
         if (menuButtonPressed) return;
 
@@ -682,6 +697,7 @@ function playGame() {
     };
 
     window.addEventListener("keydown", (event) => {
+        if (isRlEnabled()) return;
         if (pauseGame) return;
         allPlayers.forEach((player) => {
             switch (event.key) {
@@ -702,6 +718,7 @@ function playGame() {
     });
 
     window.addEventListener("keyup", (event) => {
+        if (isRlEnabled()) return;
         if (pauseGame) return;
 
         allPlayers.forEach((player) => {
