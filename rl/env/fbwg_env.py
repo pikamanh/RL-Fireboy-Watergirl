@@ -57,7 +57,7 @@ MAX_VX = MOVE_VX + 0.5
 MAX_VY_UP = abs(JUMP_VY) + 1.0
 MAX_VY_DOWN = 15.0
 
-LOCAL_RADIUS = 3
+LOCAL_RADIUS = 5
 LOCAL_GRID = LOCAL_RADIUS * 2 + 1
 BASE_OBS_DIM = 14
 OBS_DIM = BASE_OBS_DIM + 2 * LOCAL_GRID * LOCAL_GRID
@@ -194,6 +194,10 @@ class FBWGEnv(gym.Env):
         self._wg_door_bonus_given = False
         self._last_action = (0, 0)
 
+        self._best_fb_dist = float('inf')
+        self._best_wg_dist = float('inf')
+        self._no_progress_steps = 0
+
     def reset(self, *, seed: int | None = None, options: dict | None = None):
         super().reset(seed=seed)
         self._fb = PlayerState(
@@ -215,6 +219,12 @@ class FBWGEnv(gym.Env):
         self._fb_door_bonus_given = False
         self._wg_door_bonus_given = False
         self._last_action = (0, 0)
+
+        # Thêm 3 dòng này để reset logic phạt câu giờ cho ván mới:
+        self._best_fb_dist = float('inf')
+        self._best_wg_dist = float('inf')
+        self._no_progress_steps = 0
+
         return self._observe(), {}
 
     def step(self, action):
@@ -264,21 +274,37 @@ class FBWGEnv(gym.Env):
 
     def _reward_and_done(self) -> tuple[float, bool, bool]:
         if self._fb.died or self._wg.died:
-            return -75.0, True, False
+            return -20.0, True, False # Giảm phạt chết để khuyến khích thử nghiệm
 
         if self._fb.at_door and self._wg.at_door:
             return 150.0, True, False
 
         if self._step >= self.max_steps:
-            return -20.0, False, True
+            return -50.0, False, True # Tăng phạt hết giờ để ép phải kết thúc game
 
         fb_dist = self._dist_fb()
         wg_dist = self._dist_wg()
+
+        # 1. TÍNH PHẦN THƯỞNG CƠ BẢN TRƯỚC (Khởi tạo biến reward)
         shaped = (self._prev_fb_dist - fb_dist) * 0.05 + (
             self._prev_wg_dist - wg_dist
         ) * 0.05
         reward = -0.01 + shaped
 
+        # 2. KIỂM TRA TIẾN ĐỘ (LOGIC CHỐNG CÂU GIỜ)
+        if fb_dist < self._best_fb_dist or wg_dist < self._best_wg_dist:
+            self._best_fb_dist = min(self._best_fb_dist, fb_dist)
+            self._best_wg_dist = min(self._best_wg_dist, wg_dist)
+            self._no_progress_steps = 0
+        else:
+            self._no_progress_steps += 1
+
+        if self._no_progress_steps > 150:
+            reward -= 0.1  # Bây giờ reward đã tồn tại nên không bị lỗi nữa
+        if self._no_progress_steps > 300:
+            return -30.0, True, False # Chết luôn vì tội câu giờ, ép ván mới
+
+        # 3. THƯỞNG ĐẾN CỬA
         if self._fb.at_door and not self._fb_door_bonus_given:
             reward += 25.0
             self._fb_door_bonus_given = True
@@ -286,24 +312,13 @@ class FBWGEnv(gym.Env):
             reward += 25.0
             self._wg_door_bonus_given = True
 
+        # 4. PHẠT NHẢY VÔ ÍCH
         if self._last_action[0] == ACT_JUMP:
             reward -= 0.02
         if self._last_action[1] == ACT_JUMP:
             reward -= 0.02
 
-        horizontal_delta = abs(self._fb.x - self._prev_fb_x) + abs(
-            self._wg.x - self._prev_wg_x
-        )
-        if horizontal_delta < 0.5:
-            self._stalled_steps += 1
-        else:
-            self._stalled_steps = 0
-
-        if self._stalled_steps > 120:
-            reward -= 0.02
-        if self._stalled_steps > 300:
-            reward -= 0.10
-
+        # Cập nhật lại vị trí cũ cho step tiếp theo
         self._prev_fb_dist = fb_dist
         self._prev_wg_dist = wg_dist
         self._prev_fb_x = self._fb.x
